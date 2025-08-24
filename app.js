@@ -4195,7 +4195,7 @@ async function callGeminiAPI(userMessage) {
         const fullPrompt = `${systemPrompt}\n\nUSUÁRIO: ${userMessage}`;
 
         // Chama API
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${appData.settings.geminiApiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${appData.settings.geminiApiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -4373,7 +4373,7 @@ async function testGeminiConnection() {
         }
 
         // Testa API com mensagem simples
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
