@@ -1274,9 +1274,15 @@ function detectSeparator(headerLine) {
     return maxCount > 0 ? bestSeparator : ',';
 }
 
+*/
+
+
 // ==========================================
-// FUNÇÃO 5: parseCSVLine (CORRIGIDA)
+// CORREÇÃO 1: parseCSVLine (FUNÇÃO QUEBRADA)
 // ==========================================
+
+// PROCURE por: function parseCSVLine(line, separator) {
+// SUBSTITUA TODA a função por esta versão:
 
 function parseCSVLine(line, separator) {
     const result = [];
@@ -1524,9 +1530,13 @@ function parseDate(dateStr) {
     return date.toISOString().split('T')[0];
 }
 
+
 // ==========================================
-// FUNÇÃO 9: parseValue (SUPER ROBUSTA)
+// CORREÇÃO 2: parseValue (FUNÇÃO QUEBRADA)
 // ==========================================
+
+// PROCURE por: function parseValue(valueStr) {
+// SUBSTITUA TODA a função por esta versão:
 
 function parseValue(valueStr) {
     if (!valueStr && valueStr !== 0) {
@@ -1585,16 +1595,12 @@ function parseValue(valueStr) {
     return isNegative ? -number : number;
 }
 
+
 // ==========================================
 // FIM DA CORREÇÃO DE IMPORTAÇÃO CSV
 // ==========================================
 
 /*
-
-
-
-
-
 
 
 
@@ -6565,4 +6571,411 @@ if (!document.getElementById('notificationStyles')) {
 debugLog('info', 'CFO Pro v10.0 - Todos os módulos carregados');
 console.log('%cCFO Pro v10.0 🚀', 'font-size: 20px; font-weight: bold; color: #1FB8CD;');
 console.log('Dashboard Financeiro Profissional - Todas as funcionalidades implementadas!');
+
+
+// ==========================================
+// CORREÇÃO 3: FUNÇÕES DE INTERFACE FALTANTES
+// ==========================================
+
+// ADICIONE estas funções no final do arquivo app.js:
+
+/**
+ * Mostra loading screen
+ */
+function showLoadingScreen() {
+    const loadingScreen = document.getElementById('loadingScreen');
+    const mainApp = document.getElementById('mainApp');
+    
+    if (loadingScreen) {
+        loadingScreen.classList.remove('hidden');
+    }
+    
+    if (mainApp) {
+        mainApp.classList.add('hidden');
+    }
+}
+
+/**
+ * Esconde loading screen
+ */
+function hideLoadingScreen() {
+    const loadingScreen = document.getElementById('loadingScreen');
+    const mainApp = document.getElementById('mainApp');
+    const uploadSection = document.getElementById('uploadSection');
+    
+    // Remove loading screen
+    if (loadingScreen) {
+        loadingScreen.classList.add('hidden');
+    }
+    
+    // Mostra app principal
+    if (mainApp) {
+        mainApp.classList.remove('hidden');
+    }
+    
+    // Decide qual tela mostrar baseado nos dados
+    const hasTransactions = appData.transactions && appData.transactions.length > 0;
+    
+    debugLog('info', `Finalizando loading - Transações: ${hasTransactions ? appData.transactions.length : 0}`);
+    
+    if (hasTransactions) {
+        // Tem dados - vai para dashboard e esconde upload
+        if (uploadSection) {
+            uploadSection.classList.add('hidden');
+        }
+        
+        // Carrega dashboard
+        setTimeout(() => {
+            switchTab(appData.ui.currentTab || 'dashboard');
+        }, 100);
+        
+    } else {
+        // Não tem dados - mostra tela de upload
+        if (uploadSection) {
+            uploadSection.classList.remove('hidden');
+        }
+        
+        // Esconde sidebar temporariamente em mobile
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && window.innerWidth < 1024) {
+            sidebar.style.transform = 'translateX(-100%)';
+        }
+    }
+}
+
+/**
+ * Finaliza inicialização
+ */
+async function finalizeInitialization() {
+    try {
+        // Marca como inicializado
+        appState.isInitialized = true;
+        
+        // Esconde loading screen
+        hideLoadingScreen();
+        
+        debugLog('info', 'Inicialização finalizada com sucesso');
+        
+    } catch (error) {
+        debugLog('error', 'Erro na finalização:', error);
+        
+        // Força mostrar app mesmo com erro
+        const loadingScreen = document.getElementById('loadingScreen');
+        const mainApp = document.getElementById('mainApp');
+        
+        if (loadingScreen) loadingScreen.classList.add('hidden');
+        if (mainApp) mainApp.classList.remove('hidden');
+        
+        showNotification('Erro na inicialização: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Mostra estado de processamento
+ */
+function showProcessingState(show) {
+    const elements = document.querySelectorAll('.processing-indicator');
+    elements.forEach(el => {
+        if (show) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+}
+
+/**
+ * Atualiza contador de transações
+ */
+function updateTransactionCount() {
+    const count = appData.transactions ? appData.transactions.length : 0;
+    const elements = document.querySelectorAll('.transaction-count');
+    elements.forEach(el => {
+        el.textContent = count.toLocaleString('pt-BR');
+    });
+}
+
+/**
+ * Atualiza display do último backup
+ */
+function updateLastBackupDisplay() {
+    const lastBackup = appData.settings.lastBackup;
+    const elements = document.querySelectorAll('.last-backup');
+    
+    elements.forEach(el => {
+        if (lastBackup) {
+            const date = new Date(lastBackup);
+            el.textContent = date.toLocaleString('pt-BR');
+        } else {
+            el.textContent = 'Nunca';
+        }
+    });
+}
+
+/**
+ * Atualiza informações do último arquivo
+ */
+function updateLastFileInfo(filename) {
+    const elements = document.querySelectorAll('.last-file');
+    elements.forEach(el => {
+        el.textContent = filename || 'Nenhum arquivo';
+    });
+}
+
+/**
+ * Habilita interface do chat
+ */
+function enableChatInterface() {
+    const chatTab = document.getElementById('chatTab');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendChatBtn');
+    
+    if (chatTab) {
+        chatTab.classList.remove('disabled');
+    }
+    
+    if (chatInput) {
+        chatInput.disabled = false;
+        chatInput.placeholder = 'Digite sua pergunta sobre os dados financeiros...';
+    }
+    
+    if (sendBtn) {
+        sendBtn.disabled = false;
+    }
+}
+
+/**
+ * Desabilita interface do chat
+ */
+function disableChatInterface() {
+    const chatTab = document.getElementById('chatTab');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendChatBtn');
+    
+    if (chatTab) {
+        chatTab.classList.add('disabled');
+    }
+    
+    if (chatInput) {
+        chatInput.disabled = true;
+        chatInput.placeholder = 'Configure a API key do Gemini nas configurações...';
+    }
+    
+    if (sendBtn) {
+        sendBtn.disabled = true;
+    }
+}
+
+// ==========================================
+// CORREÇÃO 4: SAVE APP DATA (ESSENCIAL)
+// ==========================================
+
+/**
+ * Salva dados da aplicação
+ */
+async function saveAppData() {
+    try {
+        const dataToSave = {
+            ...appData,
+            version: '10.0',
+            lastSaved: new Date().toISOString()
+        };
+        
+        localStorage.setItem('cfoProData', JSON.stringify(dataToSave));
+        
+        debugLog('debug', 'Dados salvos no localStorage');
+        
+    } catch (error) {
+        debugLog('error', 'Erro ao salvar dados:', error);
+        showNotification('Erro ao salvar dados', 'error');
+    }
+}
+
+// ==========================================
+// CORREÇÃO 5: SISTEMA DE NOTIFICAÇÕES (ESSENCIAL)
+// ==========================================
+
+/**
+ * Sistema de notificações
+ */
+function showNotification(message, type = 'info', duration = 4000) {
+    try {
+        // Remove notificações antigas
+        document.querySelectorAll('.notification').forEach(n => n.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification--${type} fixed top-4 right-4 z-50 max-w-sm p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+        
+        const icons = {
+            'success': 'check-circle',
+            'error': 'x-circle',
+            'warning': 'alert-triangle',
+            'info': 'info'
+        };
+        
+        notification.innerHTML = `
+            <div class="flex items-center gap-3">
+                <i data-lucide="${icons[type] || 'info'}" class="w-5 h-5 flex-shrink-0"></i>
+                <div class="flex-1">
+                    <p class="font-medium text-sm">${message}</p>
+                </div>
+                <button onclick="this.closest('.notification').remove()" class="text-current opacity-70 hover:opacity-100">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        `;
+        
+        // Adiciona ao DOM
+        document.body.appendChild(notification);
+        
+        // Atualiza ícones
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
+        // Anima entrada
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Remove automaticamente
+        if (duration > 0) {
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.add('translate-x-full');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, duration);
+        }
+        
+    } catch (error) {
+        console.error('Erro na notificação:', error);
+        // Fallback para alert nativo
+        alert(`${type.toUpperCase()}: ${message}`);
+    }
+}
+
+// ==========================================
+// CORREÇÃO 6: CARREGAMENTO DE DADOS EXEMPLO (ESSENCIAL)
+// ==========================================
+
+/**
+ * Carrega dados de exemplo (função auxiliar)
+ */
+async function loadExampleData() {
+    try {
+        showNotification('Carregando dados de exemplo...', 'info');
+        
+        // Os dados de exemplo já estão definidos na inicialização
+        // Só precisamos garantir que estão salvos e atualizar a interface
+        
+        if (!appData.transactions || appData.transactions.length === 0) {
+            // Se não tem dados, inicializa novamente
+            await initializeExampleData();
+        }
+        
+        await saveAppData();
+        updateTransactionCount();
+        updateLastFileInfo('Dados de exemplo');
+        
+        // Esconde tela de upload
+        const uploadSection = document.getElementById('uploadSection');
+        if (uploadSection) {
+            uploadSection.classList.add('hidden');
+        }
+        
+        // Vai para dashboard
+        await switchTab('dashboard');
+        
+        showNotification('Dados de exemplo carregados com sucesso!', 'success');
+        debugLog('info', 'Dados de exemplo carregados');
+        
+    } catch (error) {
+        debugLog('error', 'Erro ao carregar dados de exemplo:', error);
+        showNotification('Erro ao carregar dados de exemplo', 'error');
+    }
+}
+
+// ==========================================
+// CORREÇÃO 7: TRATAMENTO DE ERROS GLOBAL
+// ==========================================
+
+/**
+ * Tratamento de erros globais
+ */
+window.addEventListener('error', function(event) {
+    debugLog('error', 'Erro JavaScript global:', {
+        message: event.message,
+        filename: event.filename,
+        line: event.lineno,
+        column: event.colno
+    });
+    
+    // Se for durante inicialização, força mostrar app
+    if (!appState.isInitialized) {
+        setTimeout(() => {
+            hideLoadingScreen();
+        }, 1000);
+    }
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+    debugLog('error', 'Promise rejeitada:', event.reason);
+    
+    // Se for durante inicialização, força mostrar app
+    if (!appState.isInitialized) {
+        setTimeout(() => {
+            hideLoadingScreen();
+        }, 1000);
+    }
+});
+
+// ==========================================
+// CORREÇÃO 8: INICIALIZAÇÃO SEGURA
+// ==========================================
+
+/**
+ * Inicialização com fallback de segurança
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    // Timeout de segurança - se não inicializar em 10 segundos, força mostrar app
+    setTimeout(() => {
+        if (!appState.isInitialized) {
+            debugLog('warn', 'Timeout de inicialização - forçando exibição');
+            hideLoadingScreen();
+            showNotification('Aplicativo iniciado em modo de recuperação', 'warning');
+        }
+    }, 10000);
+});
+
+// ==========================================
+// FIM DAS CORREÇÕES DE BUGS
+// ==========================================
+
+/*
+RESUMO DAS CORREÇÕES:
+
+✅ parseCSVLine - função completa e funcional
+✅ parseValue - função completa e funcional  
+✅ showLoadingScreen - função essencial adicionada
+✅ hideLoadingScreen - função essencial adicionada
+✅ finalizeInitialization - função essencial adicionada
+✅ saveAppData - função essencial adicionada
+✅ showNotification - sistema essencial adicionado
+✅ loadExampleData - função corrigida
+✅ Tratamento de erros globais - adicionado
+✅ Timeout de segurança - adicionado
+
+APÓS APLICAR AS CORREÇÕES:
+1. Salve o arquivo app.js
+2. Faça commit no GitHub
+3. O app deve inicializar corretamente
+4. Se ainda tiver problemas, verifique o console (F12)
+
+MANTIDO TUDO IGUAL - apenas bugs corrigidos!
+*/
 
