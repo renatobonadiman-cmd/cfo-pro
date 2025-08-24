@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CFO Pro v10.0 - Dashboard Financeiro Profissional</title>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- Local Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-background flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="animate-spin w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto mb-6"></div>
+            <h2 class="text-2xl font-semibold mb-3 text-primary">CFO Pro v10.0</h2>
+            <p class="text-text-secondary">Inicializando dashboard financeiro...</p>
+            <div class="mt-4 text-sm text-text-secondary">
+                <p>✓ Carregando dados...</p>
+                <p>✓ Inicializando interface...</p>
+                <p>✓ Configurando sistema...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden min-h-screen bg-background">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-surface border-r border-border transform -translate-x-full transition-transform duration-300 z-40 lg:translate-x-0">
+            <div class="p-6 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                        <i data-lucide="bar-chart-3" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-primary">CFO Pro</h1>
+                        <p class="text-xs text-text-secondary">v10.0</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="p-4 space-y-2">
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="dashboard">
+                    <i data-lucide="home" class="w-5 h-5"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="transactions">
+                    <i data-lucide="list" class="w-5 h-5"></i>
+                    <span>Transações</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="reconciliation">
+                    <i data-lucide="check-square" class="w-5 h-5"></i>
+                    <span>Conciliação</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="reports">
+                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                    <span>Relatórios</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="chat">
+                    <i data-lucide="message-circle" class="w-5 h-5"></i>
+                    <span>Chat IA</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="audit">
+                    <i data-lucide="search" class="w-5 h-5"></i>
+                    <span>Auditoria</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="projection">
+                    <i data-lucide="trending-up" class="w-5 h-5"></i>
+                    <span>Projeções</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="converter">
+                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    <span>Conversor</span>
+                </button>
+                <button class="nav-button w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg hover:bg-secondary transition-colors" data-tab="settings">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span>Configurações</span>
+                </button>
+            </nav>
+
+            <!-- Status Info -->
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
+                <div class="text-xs text-text-secondary space-y-1">
+                    <div class="flex justify-between">
+                        <span>Transações:</span>
+                        <span class="transaction-count font-semibold">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Status:</span>
+                        <span id="systemStatus" class="text-success">Online</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="lg:ml-64">
+            <!-- Header -->
+            <header class="bg-surface border-b border-border p-4 sticky top-0 z-30">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <button id="sidebarToggle" class="lg:hidden btn btn--outline p-2">
+                            <i data-lucide="menu" class="w-5 h-5"></i>
+                        </button>
+                        <div>
+                            <h2 id="pageTitle" class="text-lg font-semibold">Dashboard Financeiro</h2>
+                            <p class="text-sm text-text-secondary" id="pageSubtitle">Visão geral das suas finanças</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-sm text-text-secondary">Último backup:</p>
+                            <p id="lastBackup" class="text-xs font-mono">-</p>
+                        </div>
+                        <button id="quickBackup" class="btn btn--outline btn--sm" title="Backup rápido">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Upload Section (Initial State) -->
+            <div id="uploadSection" class="p-6">
+                <div class="max-w-4xl mx-auto">
+                    <div class="text-center mb-8">
+                        <div class="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="upload" class="w-10 h-10 text-primary"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold mb-3">Bem-vindo ao CFO Pro v10.0</h2>
+                        <p class="text-text-secondary text-lg">Importe suas transações para começar a análise financeira</p>
+                    </div>
+
+                    <div id="dropzone" class="dropzone mb-6">
+                        <div class="text-center">
+                            <i data-lucide="file-text" class="w-16 h-16 mx-auto mb-4 text-text-secondary"></i>
+                            <h3 class="text-xl font-semibold mb-2">Arraste e solte seu arquivo aqui</h3>
+                            <p class="text-text-secondary mb-4">ou clique para selecionar</p>
+                            <button class="btn btn--primary btn--lg">
+                                <i data-lucide="upload" class="w-5 h-5"></i>
+                                Selecionar Arquivo CSV
+                            </button>
+                            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" class="hidden">
+                        </div>
+                        <div class="mt-6 text-center">
+                            <p class="text-sm text-text-secondary">Formatos suportados: CSV, Excel (.xlsx, .xls)</p>
+                            <p class="text-xs text-text-secondary mt-1">Tamanho máximo: 10MB</p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="card">
+                            <div class="card__body">
+                                <h3 class="font-semibold mb-3 flex items-center gap-2">
+                                    <i data-lucide="database" class="w-5 h-5 text-primary"></i>
+                                    Dados Atuais
+                                </h3>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Transações carregadas:</span>
+                                        <span class="transaction-count font-semibold">0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Último arquivo:</span>
+                                        <span id="lastFileName">Dados de exemplo</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Status:</span>
+                                        <span class="text-warning">Aguardando upload</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card__body">
+                                <h3 class="font-semibold mb-3 flex items-center gap-2">
+                                    <i data-lucide="info" class="w-5 h-5 text-primary"></i>
+                                    Formato CSV Esperado
+                                </h3>
+                                <div class="text-sm space-y-1 font-mono text-text-secondary">
+                                    <div>Data, Descrição Original,</div>
+                                    <div>Entrada (R$), Saída (R$),</div>
+                                    <div>Banco Origem/Destino</div>
+                                </div>
+                                <button class="btn btn--outline btn--sm mt-3" onclick="downloadSampleCSV()">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                    Baixar Exemplo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="mt-8 text-center">
+                        <p class="text-text-secondary mb-4">Ou explore com dados de exemplo:</p>
+                        <button class="btn btn--secondary" onclick="loadExampleData()">
+                            <i data-lucide="play" class="w-4 h-4"></i>
+                            Carregar Dados de Exemplo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboardTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <!-- KPIs Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="card">
+                            <div class="card__body text-center">
+                                <div class="flex items-center justify-center gap-2 mb-2">
+                                    <i data-lucide="trending-up" class="w-5 h-5 text-success"></i>
+                                    <span class="text-sm font-medium text-text-secondary">Receitas Totais</span>
+                                </div>
+                                <p id="totalRevenue" class="text-3xl font-bold money-positive">R$ 0,00</p>
+                                <p class="text-xs text-text-secondary mt-1">Entradas acumuladas</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body text-center">
+                                <div class="flex items-center justify-center gap-2 mb-2">
+                                    <i data-lucide="trending-down" class="w-5 h-5 text-error"></i>
+                                    <span class="text-sm font-medium text-text-secondary">Despesas Totais</span>
+                                </div>
+                                <p id="totalExpenses" class="text-3xl font-bold money-negative">R$ 0,00</p>
+                                <p class="text-xs text-text-secondary mt-1">Saídas acumuladas</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body text-center">
+                                <div class="flex items-center justify-center gap-2 mb-2">
+                                    <i data-lucide="calculator" class="w-5 h-5 text-primary"></i>
+                                    <span class="text-sm font-medium text-text-secondary">Resultado Líquido</span>
+                                </div>
+                                <p id="netResult" class="text-3xl font-bold">R$ 0,00</p>
+                                <p class="text-xs text-text-secondary mt-1">Resultado do período</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body text-center">
+                                <div class="flex items-center justify-center gap-2 mb-2">
+                                    <i data-lucide="hash" class="w-5 h-5 text-info"></i>
+                                    <span class="text-sm font-medium text-text-secondary">Transações</span>
+                                </div>
+                                <p id="dashboardTransactionCount" class="text-3xl font-bold">0</p>
+                                <p class="text-xs text-text-secondary mt-1">Total de registros</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <div class="card">
+                            <div class="card__body">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h3 class="text-lg font-semibold">Fluxo de Caixa Mensal</h3>
+                                    <div class="flex items-center gap-2">
+                                        <button id="chartPeriodSelector" class="btn btn--outline btn--sm">
+                                            <i data-lucide="calendar" class="w-4 h-4"></i>
+                                            Período
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="relative h-80">
+                                    <canvas id="cashflowChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h3 class="text-lg font-semibold">Distribuição por Categoria</h3>
+                                    <button id="categoryChartType" class="btn btn--outline btn--sm">
+                                        <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                                        Pizza
+                                    </button>
+                                </div>
+                                <div class="relative h-80">
+                                    <canvas id="categoryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="card">
+                            <div class="card__body">
+                                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                                    <i data-lucide="alert-circle" class="w-4 h-4 text-warning"></i>
+                                    Pendências
+                                </h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Não conciliadas:</span>
+                                        <span id="pendingCount" class="font-semibold">0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Sem classificação:</span>
+                                        <span id="unclassifiedCount" class="font-semibold">0</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn--outline btn--sm w-full mt-3" data-tab="reconciliation">
+                                    <i data-lucide="check-square" class="w-4 h-4"></i>
+                                    Ir para Conciliação
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body">
+                                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                                    <i data-lucide="calendar" class="w-4 h-4 text-primary"></i>
+                                    Período Analisado
+                                </h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Data inicial:</span>
+                                        <span id="periodStart">-</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Data final:</span>
+                                        <span id="periodEnd">-</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Dias:</span>
+                                        <span id="periodDays">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card__body">
+                                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                                    <i data-lucide="activity" class="w-4 h-4 text-success"></i>
+                                    Performance
+                                </h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Ticket médio:</span>
+                                        <span id="avgTicket">R$ 0,00</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Maior entrada:</span>
+                                        <span id="maxRevenue">R$ 0,00</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Maior despesa:</span>
+                                        <span id="maxExpense">R$ 0,00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div id="transactionsTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <!-- Filters and Search -->
+                    <div class="card">
+                        <div class="card__body">
+                            <div class="flex flex-wrap items-center gap-4">
+                                <div class="flex-1 min-w-64">
+                                    <input type="text" id="searchTransactions" placeholder="Buscar por descrição..." class="form-control">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <select id="statusFilter" class="form-control">
+                                        <option value="all">Todos os status</option>
+                                        <option value="Conciliado">Conciliado</option>
+                                        <option value="Pendente">Pendente</option>
+                                    </select>
+                                    <input type="date" id="dateFromFilter" class="form-control">
+                                    <input type="date" id="dateToFilter" class="form-control">
+                                    <button id="clearFilters" class="btn btn--outline">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                        Limpar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions Table -->
+                    <div class="card">
+                        <div class="card__body p-0">
+                            <div class="overflow-x-auto">
+                                <table class="enhanced-table w-full">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-left cursor-pointer hover:bg-secondary" data-sort="Data">
+                                                <div class="flex items-center gap-2">
+                                                    Data
+                                                    <i data-lucide="arrow-up-down" class="w-3 h-3"></i>
+                                                </div>
+                                            </th>
+                                            <th class="text-left">Descrição</th>
+                                            <th class="text-left">Banco</th>
+                                            <th class="text-right cursor-pointer hover:bg-secondary" data-sort="value">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    Valor
+                                                    <i data-lucide="arrow-up-down" class="w-3 h-3"></i>
+                                                </div>
+                                            </th>
+                                            <th class="text-center">Status</th>
+                                            <th class="text-center">Classificação</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactionsTableBody">
+                                        <!-- Transactions will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            <div class="flex items-center justify-between p-4 border-t border-border">
+                                <div class="flex items-center gap-2 text-sm text-text-secondary">
+                                    <span>Mostrar</span>
+                                    <select id="itemsPerPage" class="form-control w-auto">
+                                        <option value="10">10</option>
+                                        <option value="25" selected>25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                    <span>por página</span>
+                                </div>
+                                <div id="paginationInfo" class="text-sm text-text-secondary">
+                                    <!-- Pagination info will be shown here -->
+                                </div>
+                                <div id="paginationControls" class="flex items-center gap-1">
+                                    <!-- Pagination controls will be shown here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reconciliation Tab -->
+            <div id="reconciliationTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">Conciliação de Transações</h2>
+                            <p class="text-text-secondary">Classifique as transações pendentes no plano de contas</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button id="autoClassify" class="btn btn--outline">
+                                <i data-lucide="zap" class="w-4 h-4"></i>
+                                Auto Classificar
+                            </button>
+                            <button id="bulkActions" class="btn btn--outline">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Ações em Lote
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="reconciliationList" class="space-y-4">
+                        <!-- Reconciliation items will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="reportsTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">Relatórios Financeiros</h2>
+                            <p class="text-text-secondary">Demonstrativos e análises detalhadas</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <select id="reportPeriod" class="form-control">
+                                <option value="all">Todo o período</option>
+                                <option value="current-month">Mês atual</option>
+                                <option value="last-month">Mês anterior</option>
+                                <option value="current-year">Ano atual</option>
+                                <option value="custom">Período customizado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Report Type Selector -->
+                    <div class="flex gap-2 border-b border-border">
+                        <button class="btn btn--ghost border-b-2 border-primary generate-report-btn active" data-report-type="dre">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                            DRE
+                        </button>
+                        <button class="btn btn--ghost generate-report-btn" data-report-type="cashflow">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                            Fluxo de Caixa
+                        </button>
+                        <button class="btn btn--ghost generate-report-btn" data-report-type="balance">
+                            <i data-lucide="balance-scale" class="w-4 h-4"></i>
+                            Balancete
+                        </button>
+                    </div>
+
+                    <!-- Report Content -->
+                    <div class="card">
+                        <div class="card__body">
+                            <div id="reportContent">
+                                <!-- Report content will be generated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat IA Tab -->
+            <div id="chatTab" class="tab-content hidden p-6">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="bot" class="w-8 h-8 text-primary"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2">Assistente IA Financeiro</h2>
+                        <p class="text-text-secondary">Faça perguntas sobre seus dados financeiros e receba insights inteligentes</p>
+                    </div>
+
+                    <!-- Chat Disabled State -->
+                    <div id="chatDisabled" class="card text-center">
+                        <div class="card__body py-12">
+                            <i data-lucide="key" class="w-12 h-12 mx-auto mb-4 text-text-secondary"></i>
+                            <h3 class="text-lg font-semibold mb-3">Configure sua API Key</h3>
+                            <p class="text-text-secondary mb-6">Para usar o chat IA, configure sua chave da Google Gemini API</p>
+                            <button class="btn btn--primary" data-tab="settings">
+                                <i data-lucide="settings" class="w-4 h-4"></i>
+                                Ir para Configurações
+                            </button>
+                            <p class="text-xs text-text-secondary mt-4">
+                                Obtenha sua API key gratuita em: 
+                                <a href="https://ai.google.dev/" target="_blank" class="text-primary hover:underline">ai.google.dev</a>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Chat Interface -->
+                    <div id="chatInterface" class="hidden">
+                        <!-- Quick Questions -->
+                        <div class="card mb-6">
+                            <div class="card__body">
+                                <h3 class="font-semibold mb-4">Perguntas Sugeridas</h3>
+                                <div class="grid md:grid-cols-2 gap-3">
+                                    <button class="quick-question btn btn--outline text-left p-3" data-question="Qual é o resumo financeiro do período?">
+                                        <div class="font-medium">Resumo Financeiro</div>
+                                        <div class="text-sm text-text-secondary">Qual é o resumo financeiro do período?</div>
+                                    </button>
+                                    <button class="quick-question btn btn--outline text-left p-3" data-question="Onde estou gastando mais dinheiro?">
+                                        <div class="font-medium">Maiores Gastos</div>
+                                        <div class="text-sm text-text-secondary">Onde estou gastando mais dinheiro?</div>
+                                    </button>
+                                    <button class="quick-question btn btn--outline text-left p-3" data-question="Como está meu fluxo de caixa mensal?">
+                                        <div class="font-medium">Fluxo de Caixa</div>
+                                        <div class="text-sm text-text-secondary">Como está meu fluxo de caixa mensal?</div>
+                                    </button>
+                                    <button class="quick-question btn btn--outline text-left p-3" data-question="Há alguma anomalia nos dados?">
+                                        <div class="font-medium">Detectar Anomalias</div>
+                                        <div class="text-sm text-text-secondary">Há alguma anomalia nos dados?</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Messages -->
+                        <div class="card mb-4">
+                            <div class="card__body p-0">
+                                <div id="chatMessages" class="h-96 overflow-y-auto p-4 space-y-4">
+                                    <!-- Chat messages will appear here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input -->
+                        <div class="card">
+                            <div class="card__body">
+                                <div class="flex gap-3">
+                                    <input type="text" id="chatInput" placeholder="Digite sua pergunta sobre os dados financeiros..." class="form-control flex-1">
+                                    <button id="sendChatBtn" class="btn btn--primary">
+                                        <i data-lucide="send" class="w-4 h-4"></i>
+                                        Enviar
+                                    </button>
+                                </div>
+                                <p class="text-xs text-text-secondary mt-2">
+                                    💡 Dica: Seja específico em suas perguntas para obter respostas mais precisas
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Tab -->
+            <div id="auditTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">Auditoria Automática</h2>
+                            <p class="text-text-secondary">Identifique inconsistências e problemas nos dados</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button id="runAudit" class="btn btn--primary">
+                                <i data-lucide="play" class="w-4 h-4"></i>
+                                Executar Auditoria
+                            </button>
+                            <button id="auditSettings" class="btn btn--outline">
+                                <i data-lucide="settings" class="w-4 h-4"></i>
+                                Configurações
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="auditResults">
+                        <!-- Audit results will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projection Tab -->
+            <div id="projectionTab" class="tab-content hidden p-6">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">Fluxo de Caixa Projetado</h2>
+                            <p class="text-text-secondary">Previsões inteligentes baseadas no histórico</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <select id="projectionPeriod" class="form-control">
+                                <option value="3">3 meses</option>
+                                <option value="6" selected>6 meses</option>
+                                <option value="12">12 meses</option>
+                            </select>
+                            <select id="projectionMethod" class="form-control">
+                                <option value="average" selected>Média móvel</option>
+                                <option value="trend">Tendência linear</option>
+                                <option value="seasonal">Sazonalidade</option>
+                            </select>
+                            <button id="updateProjection" class="btn btn--primary">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                Atualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Projection Chart -->
+                    <div class="card">
+                        <div class="card__body">
+                            <h3 class="text-lg font-semibold mb-4">Projeção de Fluxo de Caixa</h3>
+                            <div class="relative h-80">
+                                <canvas id="projectionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Projection Details -->
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <div class="card">
+                            <div class="card__body">
+                                <h3 class="text-lg font-semibold mb-4">Detalhamento Mensal</h3>
+                                <div class="overflow-x-auto">
+                                    <table id="projectionTable" class="enhanced-table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th>Mês</th>
+                                                <th class="text-right">Receitas Proj.</th>
+                                                <th class="text-right">Despesas Proj.</th>
+                                                <th class="text-right">Resultado</th>
+                                                <th class="text-center">Confiança</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Projection data will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card__body">
+                                <h3 class="text-lg font-semibold mb-4">Alertas de Risco</h3>
+                                <div id="riskAlerts" class="space-y-3">
+                                    <!-- Risk alerts will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Converter Tab -->
+            <div id="converterTab" class="tab-content hidden p-6">
+                <div class="max-w-2xl mx-auto space-y-6">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="refresh-cw" class="w-8 h-8 text-primary"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2">Conversor de Arquivos</h2>
+                        <p class="text-text-secondary">Converta entre formatos CSV e Excel</p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__body">
+                            <div id="converterDropzone" class="dropzone">
+                                <div class="text-center">
+                                    <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto mb-4 text-text-secondary"></i>
+                                    <h3 class="text-xl font-semibold mb-2">Arraste seu arquivo aqui</h3>
+                                    <p class="text-text-secondary mb-4">Excel (.xlsx, .xls) ou CSV</p>
+                                    <button class="btn btn--primary">
+                                        <i data-lucide="upload" class="w-5 h-5"></i>
+                                        Selecionar Arquivo
+                                    </button>
+                                    <input type="file" id="converterFileInput" accept=".csv,.xlsx,.xls" class="hidden">
+                                </div>
+                            </div>
+
+                            <div id="conversionResult" class="hidden mt-6 p-4 bg-secondary rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold" id="convertedFileName">arquivo_convertido.csv</p>
+                                        <p class="text-sm text-text-secondary">Arquivo convertido com sucesso</p>
+                                    </div>
+                                    <button id="downloadConverted" class="btn btn--primary btn--sm">
+                                        <i data-lucide="download" class="w-4 h-4"></i>
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settingsTab" class="tab-content hidden p-6">
+                <div class="max-w-4xl mx-auto space-y-8">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Configurações</h2>
+                        <p class="text-text-secondary">Gerencie configurações do sistema e dados</p>
+                    </div>
+
+                    <!-- AI Configuration -->
+                    <div class="card">
+                        <div class="card__body">
+                            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                                <i data-lucide="brain" class="w-5 h-5 text-primary"></i>
+                                Configuração da Inteligência Artificial
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="form-label">API Key do Google Gemini</label>
+                                    <div class="flex gap-3">
+                                        <input type="password" id="geminiApiKey" class="form-control flex-1" placeholder="Cole sua API key aqui...">
+                                        <button id="testApiConnection" class="btn btn--outline">
+                                            <i data-lucide="zap" class="w-4 h-4"></i>
+                                            Testar
+                                        </button>
+                                    </div>
+                                    <p class="text-sm text-text-secondary mt-2">
+                                        Obtenha sua API key gratuita em: 
+                                        <a href="https://ai.google.dev/" target="_blank" class="text-primary hover:underline">ai.google.dev</a>
+                                    </p>
+                                </div>
+                                <div id="apiTestResult" class="hidden p-3 rounded-lg">
+                                    <!-- API test result will be shown here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart of Accounts -->
+                    <div class="card">
+                        <div class="card__body">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <i data-lucide="folder-tree" class="w-5 h-5 text-primary"></i>
+                                    Plano de Contas
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <button id="addAccount" class="btn btn--outline btn--sm">
+                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                        Adicionar Conta
+                                    </button>
+                                    <button id="importAccounts" class="btn btn--outline btn--sm">
+                                        <i data-lucide="upload" class="w-4 h-4"></i>
+                                        Importar
+                                    </button>
+                                    <button id="exportAccounts" class="btn btn--outline btn--sm">
+                                        <i data-lucide="download" class="w-4 h-4"></i>
+                                        Exportar
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="chartOfAccountsList" class="space-y-2">
+                                <!-- Chart of accounts will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Management -->
+                    <div class="card">
+                        <div class="card__body">
+                            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                                <i data-lucide="database" class="w-5 h-5 text-primary"></i>
+                                Gerenciamento de Dados
+                            </h3>
+
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-medium mb-4">Backup e Exportação</h4>
+                                    <div class="space-y-3">
+                                        <button id="createBackup" class="btn btn--outline w-full">
+                                            <i data-lucide="save" class="w-4 h-4"></i>
+                                            Criar Backup Manual
+                                        </button>
+                                        <button id="exportData" class="btn btn--outline w-full">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            Exportar Todos os Dados
+                                        </button>
+                                        <div class="text-sm text-text-secondary">
+                                            <p>Último backup automático:</p>
+                                            <p id="lastAutoBackup" class="font-mono">-</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 class="font-medium mb-4">Importação e Restauração</h4>
+                                    <div class="space-y-3">
+                                        <button id="importData" class="btn btn--outline w-full">
+                                            <i data-lucide="upload" class="w-4 h-4"></i>
+                                            Importar Backup
+                                        </button>
+                                        <input type="file" id="importDataInput" accept=".json" class="hidden">
+                                        <button id="restoreBackup" class="btn btn--outline w-full">
+                                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                            Restaurar Backup
+                                        </button>
+                                        <div class="text-sm text-text-secondary">
+                                            <p>Backups disponíveis: <span id="backupCount">0</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Settings -->
+                    <div class="card">
+                        <div class="card__body">
+                            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                                <i data-lucide="cog" class="w-5 h-5 text-primary"></i>
+                                Configurações do Sistema
+                            </h3>
+
+                            <div class="space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-medium">Backup Automático</h4>
+                                        <p class="text-sm text-text-secondary">Criar backup automaticamente a cada 3 minutos</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="autoBackupToggle" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-medium">Modo Debug</h4>
+                                        <p class="text-sm text-text-secondary">Mostrar logs detalhados no console</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="debugModeToggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="pt-4 border-t border-border">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-medium text-error">Zona de Perigo</h4>
+                                            <p class="text-sm text-text-secondary">Ações irreversíveis - use com cuidado</p>
+                                        </div>
+                                        <button id="clearAllData" class="btn btn--outline" style="color: #dc2626; border-color: #dc2626;">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            Limpar Todos os Dados
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals and Overlays -->
+    <div id="modalOverlay" class="fixed inset-0 bg-black/50 hidden z-50">
+        <!-- Modals will be inserted here -->
+    </div>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
