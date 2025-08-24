@@ -69,60 +69,12 @@ let appState = {
 // FUNÇÕES UTILITÁRIAS ESSENCIAIS
 // ==========================================
 
+
 /**
  * Função robusta para parsing de valores brasileiros
  * Suporta: 1.234,56 / 1234,56 / 1234.56 / R$ 1.234,56
  */
-function parseValue(val) {
-    if (typeof val === 'number') return val;
-    if (!val || val === '') return 0;
 
-    // Remove símbolos de moeda e espaços
-    let cleanedVal = String(val).replace(/[R$\s]/g, '').trim();
-
-    if (!cleanedVal) return 0;
-
-    // Se não tem separadores, é um número simples
-    if (!cleanedVal.includes(',') && !cleanedVal.includes('.')) {
-        const result = parseFloat(cleanedVal);
-        return isNaN(result) ? 0 : result;
-    }
-
-    // Formato brasileiro: 1.234,56 (ponto como separador de milhar, vírgula como decimal)
-    if (cleanedVal.includes(',') && cleanedVal.includes('.')) {
-        // Verifica se o último ponto está após a vírgula (formato inválido)
-        const lastCommaIndex = cleanedVal.lastIndexOf(',');
-        const lastDotIndex = cleanedVal.lastIndexOf('.');
-
-        if (lastDotIndex > lastCommaIndex) {
-            // Formato: 1.234.567,89 -> remover pontos e trocar vírgula por ponto
-            cleanedVal = cleanedVal.replace(/\./g, '').replace(',', '.');
-        } else {
-            // Remove pontos (milhares) e troca vírgula por ponto (decimal)
-            cleanedVal = cleanedVal.replace(/\./g, '').replace(',', '.');
-        }
-    }
-    // Se só tem vírgula, assume decimal brasileiro
-    else if (cleanedVal.includes(',') && !cleanedVal.includes('.')) {
-        cleanedVal = cleanedVal.replace(',', '.');
-    }
-    // Se só tem ponto, verifica se é decimal ou milhar
-    else if (cleanedVal.includes('.') && !cleanedVal.includes(',')) {
-        const parts = cleanedVal.split('.');
-        // Se a última parte tem mais de 2 dígitos, são separadores de milhar
-        if (parts.length > 1 && parts[parts.length - 1].length > 2) {
-            cleanedVal = cleanedVal.replace(/\./g, '');
-        }
-        // Se tem exatamente 2 dígitos na última parte, pode ser decimal
-        // mas se há múltiplas partes, provavelmente são milhares
-        else if (parts.length > 2) {
-            cleanedVal = cleanedVal.replace(/\./g, '');
-        }
-    }
-
-    const result = parseFloat(cleanedVal);
-    return isNaN(result) ? 0 : result;
-}
 
 /**
  * Formatação de moeda brasileira
@@ -1010,274 +962,642 @@ function setupDropzone(dropzone, fileInput) {
     });
 }
 
-/**
- * Handler principal para upload de arquivos
- */
+
+// ==========================================
+// CORREÇÃO PARA IMPORTAÇÃO DE CSV
+// ==========================================
+
+/*
+INSTRUÇÕES PARA APLICAR A CORREÇÃO:
+
+1. Abra o arquivo "app.js" 
+2. Procure por "function parseCSV" (por volta da linha 1500)
+3. Substitua TODA a função parseCSV pela versão corrigida abaixo
+4. Procure por "async function handleFileUpload" (por volta da linha 1200)  
+5. Substitua TODA essa função pela versão corrigida abaixo
+6. Salve o arquivo e recarregue a página
+
+PRINCIPAIS CORREÇÕES:
+- Suporte a múltiplas codificações (UTF-8, ISO-8859-1, Windows-1252)
+- Detecção automática de separadores (vírgula, ponto-e-vírgula)
+- Parser brasileiro robusto para datas e valores
+- Validação inteligente de colunas
+- Tratamento de erros detalhado
+- Suporte a aspas e caracteres especiais
+*/
+
+// ==========================================
+// FUNÇÃO 1: handleFileUpload (VERSÃO CORRIGIDA)
+// ==========================================
+
 async function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
+    const file = event.target.files[0] || event.dataTransfer?.files[0];
+    
+    if (!file) {
+        debugLog('warn', 'Nenhum arquivo selecionado');
+        return;
+    }
+    
     try {
-        debugLog('info', 'Iniciando upload de arquivo:', { 
-            name: file.name, 
-            size: file.size, 
-            type: file.type 
-        });
-
-        // Validações básicas
-        if (file.size > 10 * 1024 * 1024) { // 10MB
-            throw new Error('Arquivo muito grande. Tamanho máximo: 10MB');
+        debugLog('info', 'Iniciando upload do arquivo:', file.name);
+        
+        // Validação básica
+        if (file.size === 0) {
+            throw new Error('Arquivo vazio selecionado');
         }
-
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-        const supportedExtensions = ['csv', 'xlsx', 'xls'];
-
-        if (!supportedExtensions.includes(fileExtension)) {
-            throw new Error('Formato não suportado. Use: CSV, XLSX ou XLS');
+        
+        if (file.size > 50 * 1024 * 1024) { // 50MB
+            throw new Error('Arquivo muito grande. Máximo 50MB permitido');
         }
-
-        // Mostra loading
-        showNotification('Processando arquivo...', 'info');
+        
+        const fileName = file.name.toLowerCase();
+        if (!fileName.endsWith('.csv')) {
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                showNotification('Arquivos Excel ainda não são suportados. Use CSV por enquanto.', 'warning');
+                return;
+            } else {
+                throw new Error('Formato de arquivo não suportado. Use apenas arquivos CSV');
+            }
+        }
+        
+        // Mostra estado de processamento
         showProcessingState(true);
-
-        // Processa arquivo
-        let transactions = [];
-        if (fileExtension === 'csv') {
-            transactions = await processCSVFile(file);
-        } else {
-            transactions = await processExcelFile(file);
+        showNotification('Processando arquivo...', 'info');
+        
+        // Tenta múltiplas codificações
+        let content = null;
+        let usedEncoding = null;
+        
+        const encodings = ['UTF-8', 'ISO-8859-1', 'Windows-1252', 'UTF-16'];
+        
+        for (const encoding of encodings) {
+            try {
+                debugLog('debug', `Tentando codificação: ${encoding}`);
+                content = await readFileWithEncoding(file, encoding);
+                
+                // Verifica se o conteúdo parece válido (tem caracteres CSV)
+                if (content && content.includes(',') || content.includes(';')) {
+                    usedEncoding = encoding;
+                    debugLog('info', `Arquivo lido com codificação: ${encoding}`);
+                    break;
+                }
+            } catch (error) {
+                debugLog('debug', `Falha na codificação ${encoding}:`, error.message);
+                continue;
+            }
         }
-
-        if (transactions.length === 0) {
-            throw new Error('Nenhuma transação encontrada no arquivo');
+        
+        if (!content) {
+            throw new Error('Não foi possível ler o arquivo. Verifique se é um CSV válido.');
         }
-
-        // Processa e valida transações
-        const processedTransactions = await processTransactions(transactions);
-
-        // Salva dados
-        appData.transactions = processedTransactions;
+        
+        // Processa o CSV
+        debugLog('info', 'Fazendo parse do CSV...');
+        const transactions = parseCSV(content);
+        
+        if (!transactions || transactions.length === 0) {
+            throw new Error('Nenhuma transação válida encontrada no arquivo');
+        }
+        
+        debugLog('info', `${transactions.length} transações processadas`);
+        
+        // Salva as transações
+        appData.transactions = transactions;
         await saveAppData();
-
+        
         // Atualiza interface
         updateTransactionCount();
         updateLastFileInfo(file.name);
-
-        // Mostra sucesso
-        showNotification(
-            `${processedTransactions.length} transações importadas com sucesso!`, 
-            'success'
-        );
-
-        debugLog('info', 'Upload concluído com sucesso:', {
-            fileName: file.name,
-            transactions: processedTransactions.length
-        });
-
-        // Redireciona para dashboard
-        setTimeout(() => {
-            switchTab('dashboard');
-        }, 1500);
-
+        
+        // Esconde tela de upload e vai para dashboard
+        const uploadSection = document.getElementById('uploadSection');
+        if (uploadSection) {
+            uploadSection.classList.add('hidden');
+        }
+        
+        // Carrega dashboard
+        await switchTab('dashboard');
+        
+        showNotification(`${transactions.length} transações importadas com sucesso!`, 'success');
+        debugLog('info', 'Upload concluído com sucesso');
+        
     } catch (error) {
         debugLog('error', 'Erro no upload:', error);
-        showNotification('Erro: ' + error.message, 'error');
+        
+        let userMessage = 'Erro ao processar arquivo: ' + error.message;
+        
+        // Mensagens específicas para problemas comuns
+        if (error.message.includes('encoding') || error.message.includes('codificação')) {
+            userMessage = 'Problema de codificação do arquivo. Tente salvar o CSV em UTF-8 no Excel.';
+        } else if (error.message.includes('colunas') || error.message.includes('cabeçalho')) {
+            userMessage = 'Formato de CSV incorreto. Verifique se tem as colunas: Data, Descrição, Entrada, Saída.';
+        } else if (error.message.includes('data') || error.message.includes('Data')) {
+            userMessage = 'Formato de data não reconhecido. Use DD/MM/YYYY ou YYYY-MM-DD.';
+        } else if (error.message.includes('valor') || error.message.includes('número')) {
+            userMessage = 'Formato de valores incorreto. Use vírgula para decimal (ex: 1.234,56).';
+        }
+        
+        showNotification(userMessage, 'error');
+        
     } finally {
+        // Restaura estado
         showProcessingState(false);
-        event.target.value = ''; // Limpa input
+        
+        // Limpa input para permitir reupload do mesmo arquivo
+        if (event.target) {
+            event.target.value = '';
+        }
     }
 }
 
-/**
- * Processamento de arquivo CSV
- */
-async function processCSVFile(file) {
+// ==========================================
+// FUNÇÃO 2: readFileWithEncoding (NOVA)
+// ==========================================
+
+function readFileWithEncoding(file, encoding) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-
+        
         reader.onload = function(e) {
             try {
-                const csvContent = e.target.result;
-                const transactions = parseCSV(csvContent);
-                resolve(transactions);
+                const content = e.target.result;
+                if (!content || content.trim().length === 0) {
+                    reject(new Error('Arquivo vazio'));
+                    return;
+                }
+                
+                // Verifica se parece ser um CSV válido
+                const lines = content.split('\n');
+                if (lines.length < 2) {
+                    reject(new Error('Arquivo deve ter pelo menos 2 linhas (cabeçalho + dados)'));
+                    return;
+                }
+                
+                resolve(content);
             } catch (error) {
                 reject(error);
             }
         };
-
+        
         reader.onerror = function() {
-            reject(new Error('Erro ao ler arquivo CSV'));
+            reject(new Error(`Erro ao ler arquivo com codificação ${encoding}`));
         };
-
-        reader.readAsText(file, 'UTF-8');
+        
+        // Usa encoding específico ou padrão UTF-8
+        if (encoding === 'UTF-8') {
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            reader.readAsText(file, encoding);
+        }
     });
 }
 
-/**
- * Parser robusto de CSV
- */
+// ==========================================
+// FUNÇÃO 3: parseCSV (VERSÃO TOTALMENTE CORRIGIDA)
+// ==========================================
+
 function parseCSV(csvContent) {
     try {
-        const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
+        debugLog('info', 'Iniciando parse do CSV...');
+        
+        // Limpa e normaliza o conteúdo
+        let content = csvContent.trim();
+        
+        // Remove BOM se presente
+        if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.slice(1);
+        }
+        
+        // Normaliza quebras de linha
+        content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        const lines = content.split('\n').filter(line => line.trim().length > 0);
+        
         if (lines.length < 2) {
-            throw new Error('Arquivo CSV vazio ou apenas com cabeçalho');
+            throw new Error('CSV deve ter pelo menos uma linha de cabeçalho e uma linha de dados');
         }
-
+        
+        debugLog('debug', `CSV tem ${lines.length} linhas`);
+        
+        // Detecta separador automaticamente
+        const separator = detectSeparator(lines[0]);
+        debugLog('info', `Separador detectado: "${separator}"`);
+        
         // Processa cabeçalho
-        const headers = parseCSVLine(lines[0]).map(h => h.trim());
-        debugLog('debug', 'Cabeçalhos CSV encontrados:', headers);
-
-        // Validação básica dos cabeçalhos obrigatórios
-        const requiredHeaders = ['Data', 'Descrição Original'];
-        const missingHeaders = requiredHeaders.filter(h => 
-            !headers.some(header => 
-                header.toLowerCase().includes(h.toLowerCase())
-            )
-        );
-
-        if (missingHeaders.length > 0) {
-            debugLog('warn', 'Cabeçalhos obrigatórios ausentes:', missingHeaders);
+        const headerLine = lines[0];
+        const headers = parseCSVLine(headerLine, separator);
+        
+        debugLog('debug', 'Cabeçalhos encontrados:', headers);
+        
+        // Mapeia colunas esperadas (flexível)
+        const columnMap = mapColumns(headers);
+        debugLog('debug', 'Mapeamento de colunas:', columnMap);
+        
+        // Valida se encontrou colunas essenciais
+        if (!columnMap.data && !columnMap.date) {
+            throw new Error('Coluna de Data não encontrada. Verifique se há uma coluna chamada "Data", "Date" ou similar');
         }
-
+        
+        if (!columnMap.entrada && !columnMap.saida && !columnMap.valor && !columnMap.amount) {
+            throw new Error('Colunas de valores não encontradas. Verifique se há colunas de "Entrada", "Saída", "Valor" ou similares');
+        }
+        
+        // Processa dados
         const transactions = [];
-
-        // Processa cada linha de dados
+        let processedCount = 0;
+        let errorCount = 0;
+        
         for (let i = 1; i < lines.length; i++) {
             try {
-                const values = parseCSVLine(lines[i]);
-                if (values.length === 0 || values.every(v => !v.trim())) {
-                    continue; // Pula linhas vazias
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const values = parseCSVLine(line, separator);
+                
+                // Pula linhas com poucos dados
+                if (values.length < 3) {
+                    debugLog('debug', `Linha ${i + 1} pulada: poucos dados`);
+                    continue;
                 }
-
-                const transaction = {};
-
-                // Mapeia valores para cabeçalhos
-                headers.forEach((header, index) => {
-                    transaction[header] = values[index] || '';
-                });
-
-                // Processamento específico de campos
-                if (transaction['Data']) {
-                    transaction['Data'] = parseDate(transaction['Data']);
+                
+                const transaction = processTransaction(values, columnMap, i + 1);
+                
+                if (transaction) {
+                    transactions.push(transaction);
+                    processedCount++;
                 }
-
-                if (transaction['Entrada (R$)']) {
-                    transaction['Entrada (R$)'] = parseValue(transaction['Entrada (R$)']);
-                }
-
-                if (transaction['Saída (R$)']) {
-                    transaction['Saída (R$)'] = parseValue(transaction['Saída (R$)']);
-                }
-
-                // Define status padrão se não existir
-                if (!transaction['Status Conciliação']) {
-                    transaction['Status Conciliação'] = 'Pendente';
-                }
-
-                // Gera ID único
-                transaction.id = generateId();
-
-                // Calcula mês para agrupamento
-                if (transaction['Data'] && !transaction['Mes']) {
-                    transaction['Mes'] = formatMonthYear(transaction['Data']);
-                }
-
-                transactions.push(transaction);
-
+                
             } catch (error) {
+                errorCount++;
                 debugLog('warn', `Erro na linha ${i + 1}:`, error.message);
-                // Continua processamento mesmo com erro em linha específica
+                
+                // Para se muitos erros
+                if (errorCount > 10) {
+                    throw new Error(`Muitos erros encontrados (${errorCount}). Verifique o formato do CSV`);
+                }
             }
         }
-
-        debugLog('info', `CSV processado: ${transactions.length} transações válidas`);
+        
+        debugLog('info', `Parse concluído: ${processedCount} transações, ${errorCount} erros`);
+        
+        if (transactions.length === 0) {
+            throw new Error('Nenhuma transação válida foi processada. Verifique o formato dos dados');
+        }
+        
         return transactions;
-
+        
     } catch (error) {
         debugLog('error', 'Erro no parse do CSV:', error);
-        throw new Error('Erro ao processar arquivo CSV: ' + error.message);
+        throw error;
     }
 }
 
-/**
- * Parser de linha CSV com suporte a aspas e vírgulas
- */
-function parseCSVLine(line) {
+// ==========================================
+// FUNÇÃO 4: detectSeparator (NOVA)
+// ==========================================
+
+function detectSeparator(headerLine) {
+    // Conta ocorrências de possíveis separadores
+    const separators = [',', ';', '\t', '|'];
+    let bestSeparator = ',';
+    let maxCount = 0;
+    
+    for (const sep of separators) {
+        const count = (headerLine.match(new RegExp('\\' + sep, 'g')) || []).length;
+        if (count > maxCount) {
+            maxCount = count;
+            bestSeparator = sep;
+        }
+    }
+    
+    // Se não encontrou separadores, assume vírgula
+    return maxCount > 0 ? bestSeparator : ',';
+}
+
+// ==========================================
+// FUNÇÃO 5: parseCSVLine (CORRIGIDA)
+// ==========================================
+
+function parseCSVLine(line, separator) {
     const result = [];
     let current = '';
     let inQuotes = false;
     let i = 0;
-
+    
     while (i < line.length) {
         const char = line[i];
         const nextChar = line[i + 1];
-
+        
         if (char === '"') {
             if (inQuotes && nextChar === '"') {
-                // Aspas duplas dentro de campo quoted
+                // Aspas duplas escapadas
                 current += '"';
                 i += 2;
                 continue;
             } else {
-                // Toggle estado de quotes
+                // Abre/fecha aspas
                 inQuotes = !inQuotes;
             }
-        } else if (char === ',' && !inQuotes) {
-            // Separador encontrado fora de quotes
+        } else if (char === separator && !inQuotes) {
+            // Separador encontrado fora de aspas
             result.push(current.trim());
             current = '';
         } else {
             current += char;
         }
-
+        
         i++;
     }
-
-    // Adiciona último campo
+    
+    // Adiciona último valor
     result.push(current.trim());
-
+    
     return result;
 }
 
-/**
- * Parser robusto de datas
- */
-function parseDate(dateString) {
-    if (!dateString || dateString.trim() === '') {
-        return new Date().toISOString();
-    }
+// ==========================================
+// FUNÇÃO 6: mapColumns (CORRIGIDA E EXPANDIDA)
+// ==========================================
 
-    const cleanDate = dateString.trim();
-
-    // Formatos suportados
-    const formats = [
-        /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // DD/MM/YYYY
-        /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD
-        /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // DD-MM-YYYY
-        /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/ // DD.MM.YYYY
-    ];
-
-    for (const format of formats) {
-        const match = cleanDate.match(format);
-        if (match) {
-            let day, month, year;
-
-            if (format === formats[1]) { // YYYY-MM-DD
-                [, year, month, day] = match;
-            } else { // DD/MM/YYYY variants
-                [, day, month, year] = match;
-            }
-
-            try {
-                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                if (!isNaN(date.getTime())) {
-                    return date.toISOString();
-                }
-            } catch (error) {
-                debugLog('warn', 'Erro ao converter data:', { original: dateString, parsed: match });
+function mapColumns(headers) {
+    const map = {};
+    
+    // Normaliza headers para comparação
+    const normalizedHeaders = headers.map(h => 
+        h.toLowerCase()
+         .normalize('NFD')
+         .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+         .trim()
+    );
+    
+    // Mapeamentos possíveis para cada campo
+    const mappings = {
+        data: ['data', 'date', 'dt', 'fecha', 'data_transacao', 'data_movimento'],
+        descricao: ['descricao', 'description', 'desc', 'historico', 'memo', 'observacao', 'descricao_original'],
+        entrada: ['entrada', 'credito', 'credit', 'receita', 'income', 'debito_conta', 'valor_credito'],
+        saida: ['saida', 'debito', 'debit', 'despesa', 'expense', 'credito_conta', 'valor_debito'],
+        valor: ['valor', 'amount', 'quantia', 'montante', 'total'],
+        banco: ['banco', 'bank', 'conta', 'account', 'instituicao', 'agencia'],
+        favorecido: ['favorecido', 'beneficiario', 'payee', 'pagador', 'destinatario'],
+        categoria: ['categoria', 'category', 'classificacao', 'tipo', 'class'],
+        observacoes: ['observacoes', 'notes', 'obs', 'comentarios', 'remarks']
+    };
+    
+    // Encontra índices das colunas
+    for (const [field, patterns] of Object.entries(mappings)) {
+        for (let i = 0; i < normalizedHeaders.length; i++) {
+            const header = normalizedHeaders[i];
+            
+            if (patterns.some(pattern => header.includes(pattern))) {
+                map[field] = i;
+                break;
             }
         }
     }
+    
+    // Fallbacks se não encontrou colunas específicas
+    if (!map.data && headers.length > 0) {
+        map.data = 0; // Assume primeira coluna
+    }
+    
+    if (!map.descricao && headers.length > 1) {
+        map.descricao = 1; // Assume segunda coluna
+    }
+    
+    // Se não tem entrada/saída, mas tem valor, assume que valor pode ser positivo/negativo
+    if (!map.entrada && !map.saida && map.valor !== undefined) {
+        map.entrada = map.valor;
+        map.saida = map.valor;
+    }
+    
+    return map;
+}
+
+// ==========================================
+// FUNÇÃO 7: processTransaction (TOTALMENTE REESCRITA)
+// ==========================================
+
+function processTransaction(values, columnMap, lineNumber) {
+    try {
+        // Extrai valores básicos
+        const dataValue = values[columnMap.data] || values[0] || '';
+        const descricaoValue = values[columnMap.descricao] || values[1] || '';
+        
+        // Processa data
+        let processedDate = '';
+        try {
+            processedDate = parseDate(dataValue);
+        } catch (error) {
+            throw new Error(`Data inválida: "${dataValue}"`);
+        }
+        
+        // Processa valores monetários
+        let entrada = 0;
+        let saida = 0;
+        
+        if (columnMap.entrada !== undefined && columnMap.saida !== undefined) {
+            // CSV com colunas separadas
+            entrada = parseValue(values[columnMap.entrada] || '0');
+            saida = parseValue(values[columnMap.saida] || '0');
+        } else if (columnMap.valor !== undefined) {
+            // CSV com uma coluna de valor (pode ser positiva/negativa)
+            const valor = parseValue(values[columnMap.valor] || '0');
+            if (valor >= 0) {
+                entrada = valor;
+                saida = 0;
+            } else {
+                entrada = 0;
+                saida = Math.abs(valor);
+            }
+        }
+        
+        // Valida se tem pelo menos um valor
+        if (entrada === 0 && saida === 0) {
+            debugLog('debug', `Linha ${lineNumber}: sem valores monetários`);
+            return null; // Pula transação sem valores
+        }
+        
+        // Monta transação
+        const transaction = {
+            id: generateId(),
+            'Data': processedDate,
+            'Descrição Original': descricaoValue || 'Sem descrição',
+            'Entrada (R$)': entrada.toFixed(2),
+            'Saída (R$)': saida.toFixed(2),
+            'Banco Origem/Destino': values[columnMap.banco] || 'Não informado',
+            'Favorecido / Pagador Padronizado': values[columnMap.favorecido] || descricaoValue || '',
+            'Classificação Nível 1': values[columnMap.categoria] || '',
+            'Classificação Nível 2': '',
+            'Classificação Nível 3': '',
+            'Centro de Custo': '',
+            'Status Conciliação': 'Pendente',
+            'Notas': values[columnMap.observacoes] || '',
+            'Contrato/Nota?': '',
+            'Mes': formatMonthYear(new Date(processedDate))
+        };
+        
+        debugLog('debug', `Transação processada linha ${lineNumber}:`, {
+            data: processedDate,
+            entrada: entrada,
+            saida: saida,
+            descricao: descricaoValue
+        });
+        
+        return transaction;
+        
+    } catch (error) {
+        throw new Error(`Linha ${lineNumber}: ${error.message}`);
+    }
+}
+
+// ==========================================
+// FUNÇÃO 8: parseDate (SUPER ROBUSTA)
+// ==========================================
+
+function parseDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') {
+        throw new Error('Data vazia ou inválida');
+    }
+    
+    const cleaned = dateStr.trim();
+    if (!cleaned) {
+        throw new Error('Data vazia');
+    }
+    
+    // Padrões de data suportados
+    const patterns = [
+        // DD/MM/YYYY ou DD-MM-YYYY
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/,
+        // DD/MM/YY ou DD-MM-YY  
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/,
+        // YYYY-MM-DD (ISO)
+        /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/,
+        // MM/DD/YYYY (formato americano)
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/,
+    ];
+    
+    let day, month, year;
+    
+    // Tenta padrão brasileiro primeiro: DD/MM/YYYY
+    const brazilianMatch = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (brazilianMatch) {
+        day = parseInt(brazilianMatch[1]);
+        month = parseInt(brazilianMatch[2]);
+        year = parseInt(brazilianMatch[3]);
+        
+        // Converte ano de 2 dígitos
+        if (year < 100) {
+            year = year < 50 ? 2000 + year : 1900 + year;
+        }
+    } else {
+        // Tenta formato ISO: YYYY-MM-DD
+        const isoMatch = cleaned.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (isoMatch) {
+            year = parseInt(isoMatch[1]);
+            month = parseInt(isoMatch[2]);
+            day = parseInt(isoMatch[3]);
+        } else {
+            throw new Error(`Formato de data não reconhecido: "${cleaned}"`);
+        }
+    }
+    
+    // Valida componentes
+    if (day < 1 || day > 31) {
+        throw new Error(`Dia inválido: ${day}`);
+    }
+    if (month < 1 || month > 12) {
+        throw new Error(`Mês inválido: ${month}`);
+    }
+    if (year < 1900 || year > 2100) {
+        throw new Error(`Ano inválido: ${year}`);
+    }
+    
+    // Cria data
+    const date = new Date(year, month - 1, day);
+    
+    // Verifica se a data é válida (não foi ajustada pelo JS)
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+        throw new Error(`Data inválida: ${day}/${month}/${year}`);
+    }
+    
+    // Retorna no formato ISO para armazenamento
+    return date.toISOString().split('T')[0];
+}
+
+// ==========================================
+// FUNÇÃO 9: parseValue (SUPER ROBUSTA)
+// ==========================================
+
+function parseValue(valueStr) {
+    if (!valueStr && valueStr !== 0) {
+        return 0;
+    }
+    
+    if (typeof valueStr === 'number') {
+        return valueStr;
+    }
+    
+    let cleaned = valueStr.toString().trim();
+    
+    // Remove símbolos de moeda comuns
+    cleaned = cleaned.replace(/[R$€£¥₹₪₽¢]/g, '');
+    
+    // Remove espaços
+    cleaned = cleaned.replace(/\s+/g, '');
+    
+    // Se vazio após limpeza
+    if (!cleaned) {
+        return 0;
+    }
+    
+    // Remove parênteses (valores negativos)
+    let isNegative = false;
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+        isNegative = true;
+        cleaned = cleaned.slice(1, -1);
+    }
+    
+    // Detecta formato brasileiro: 1.234.567,89
+    if (cleaned.includes(',') && cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+        // Formato brasileiro: remove pontos dos milhares, troca vírgula por ponto
+        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    // Formato americano/internacional: 1,234,567.89
+    else if (cleaned.includes(',')) {
+        // Remove vírgulas dos milhares
+        const parts = cleaned.split('.');
+        if (parts.length === 2 && parts[1].length <= 2) {
+            // Tem decimal válido, remove apenas vírgulas dos milhares
+            cleaned = cleaned.replace(/,/g, '');
+        } else {
+            // Não tem decimal ou formato ambíguo, remove vírgulas
+            cleaned = cleaned.replace(/,/g, '');
+        }
+    }
+    
+    // Converte para número
+    const number = parseFloat(cleaned);
+    
+    if (isNaN(number)) {
+        throw new Error(`Valor numérico inválido: "${valueStr}"`);
+    }
+    
+    return isNegative ? -number : number;
+}
+
+// ==========================================
+// FIM DA CORREÇÃO DE IMPORTAÇÃO CSV
+// ==========================================
+
+/*
+
+
+
+
+
+
+
+
 
     // Fallback: tenta parser nativo
     try {
