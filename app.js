@@ -2487,29 +2487,7 @@ function showLoadingScreen() {
     }
 }
 
-function hideLoadingScreen() {
-    const loadingScreen = document.getElementById('loadingScreen');
-    const mainApp = document.getElementById('mainApp');
-
-    if (loadingScreen) {
-        loadingScreen.classList.add('hidden');
-    }
-
-    if (mainApp) {
-        mainApp.classList.remove('hidden');
-    }
-
-    // Decide qual tela mostrar
-    if (appData.transactions.length > 0) {
-        switchTab(appData.ui.currentTab || 'dashboard');
-    } else {
-        const uploadSection = document.getElementById('uploadSection');
-        if (uploadSection) {
-            uploadSection.classList.remove('hidden');
-        }
-    }
-}
-
+function hideLoadingScreen
 
 // ==========================================
 // GESTÃO DE TRANSAÇÕES
@@ -6408,35 +6386,6 @@ async function createAutoBackup() {
 // ==========================================
 // FINALIZAÇÃO E UTILITÁRIOS
 // ==========================================
-
-/**
- * Finaliza inicialização
- */
-async function finalizeInitialization() {
-    try {
-        // Marca como inicializado
-        appState.isInitialized = true;
-
-        // Esconde loading screen
-        hideLoadingScreen();
-
-        // Decide tela inicial
-        if (appData.transactions.length > 0) {
-            await switchTab(appData.ui.currentTab || 'dashboard');
-        } else {
-            const uploadSection = document.getElementById('uploadSection');
-            if (uploadSection) {
-                uploadSection.classList.remove('hidden');
-            }
-        }
-
-        debugLog('info', 'Inicialização finalizada com sucesso');
-
-    } catch (error) {
-        debugLog('error', 'Erro na finalização:', error);
-        throw error;
-    }
-}
 
 /**
  * Sistema de notificações
